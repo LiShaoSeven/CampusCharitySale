@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>校园义卖性价比模拟系统</title>
-    <!-- 引入ECharts可视化 -->
     <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
     <style>
         * {
@@ -74,7 +73,7 @@
             margin-bottom: 20px;
             flex-wrap: wrap;
         }
-        .add-btn, .calculate-btn, .reset-btn {
+        .add-btn, .calculate-btn, .reset-btn, .custom-sim-btn {
             padding: 10px 20px;
             border: none;
             border-radius: 6px;
@@ -102,6 +101,13 @@
         }
         .reset-btn:hover {
             background-color: #4b5563;
+        }
+        .custom-sim-btn {
+            background-color: #f59e0b;
+            color: white;
+        }
+        .custom-sim-btn:hover {
+            background-color: #d97706;
         }
         /* 表格样式 */
         table {
@@ -133,6 +139,26 @@
         .result-cell {
             color: #2563eb;
             font-weight: bold;
+        }
+        /* 自定义顺序样式 */
+        .custom-sort-area {
+            background-color: #f8fafc;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .custom-sort-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        .custom-tips {
+            color: #6b7280;
+            font-size: 12px;
+            margin-top: 5px;
         }
         /* 结果展示样式 */
         .result-section {
@@ -180,32 +206,36 @@
     <div class="container">
         <h1>校园义卖性价比模拟系统</h1>
 
-        <!-- 场景参数设置区（核心：单客限购 + 摊位最大容量） -->
+        <!-- 场景参数设置区（匹配C++的SaleParams） -->
         <h2>一、义卖场景参数</h2>
         <div class="scene-params">
             <div class="param-item">
                 <label for="totalTime">义卖总时长（分钟）</label>
-                <input type="number" id="totalTime" value="240" min="1" step="1">
+                <input type="number" id="totalTime" value="120" min="1" step="1">
             </div>
             <div class="param-item">
-                <label for="flowRate">客流量（人/分钟）</label>
-                <input type="number" id="flowRate" value="0.5" min="0.1" step="0.1">
+                <label for="customersPerUnit">客流量（人/分钟）</label>
+                <input type="number" id="customersPerUnit" value="5" min="0.1" step="0.1">
             </div>
             <div class="param-item">
-                <label for="buyLimit">单客限购数（件/人）</label>
-                <input type="number" id="buyLimit" value="3" min="1" step="1">
+                <label for="maxPurchases">单客限购数（件/人）</label>
+                <input type="number" id="maxPurchases" value="2" min="1" step="1">
             </div>
             <div class="param-item">
                 <label for="stallCapacity">摊位最大容量（件商品）</label>
                 <input type="number" id="stallCapacity" value="6" min="1" step="1">
             </div>
+            <div class="param-item">
+                <label for="numSimulations">模拟次数</label>
+                <input type="number" id="numSimulations" value="200" min="1" step="1">
+            </div>
         </div>
 
-        <!-- 商品参数表格（带默认8件商品数据） -->
+        <!-- 商品参数表格 -->
         <h2>二、商品参数</h2>
         <div class="btn-group">
             <button class="add-btn" onclick="addRow()">+ 添加商品行</button>
-            <button class="calculate-btn" onclick="calculateAll()">一键计算+模拟利润</button>
+            <button class="calculate-btn" onclick="calculateAll()">计算</button>
             <button class="reset-btn" onclick="resetData()">重置默认数据</button>
         </div>
         <table id="goodsTable">
@@ -219,11 +249,10 @@
                     <th>离开概率(r)</th>
                     <th>l×m</th>
                     <th>性价比</th>
-                    <th>摆放顺序</th>
+                    <th>最优摆放顺序</th>
                 </tr>
             </thead>
             <tbody>
-                <!-- 默认8件商品数据 -->
                 <tr>
                     <td><input type="number" value="1" min="1" readonly></td>
                     <td><input type="number" value="0.6" step="0.01" min="0" max="1" onblur="checkSum(this)"></td>
@@ -315,18 +344,26 @@
             </tbody>
         </table>
 
+        <!-- 自定义顺序模拟区 -->
+        <div class="custom-sort-area">
+            <h2>三、自定义摆放顺序模拟</h2>
+            <input type="text" class="custom-sort-input" id="customSortInput" placeholder="请输入自定义商品ID顺序，用英文逗号分隔（例：5,3,1,6,2,4）">
+            <div class="custom-tips">提示：输入的ID需为表格中已存在的商品ID，数量不超过摊位最大容量（当前：6件）</div>
+            <button class="custom-sim-btn" onclick="simulateCustomSort()">执行自定义顺序模拟</button>
+        </div>
+
         <!-- 结果展示区 -->
         <div class="result-section">
             <div class="sort-result">
                 <h3>最优摆放顺序（数字越小越靠前）：</h3>
-                <div class="sort-list" id="sortResult">请先点击「一键计算+模拟利润」</div>
+                <div class="sort-list" id="sortResult">请先点击「计算」</div>
                 <div class="capacity-tips" id="capacityTips"></div>
             </div>
 
             <div class="simulation-result">
-                <h3>利润模拟对比（优化排序 vs 默认排序）：</h3>
+                <h3>利润模拟对比：</h3>
                 <div id="simulationText">请先点击计算</div>
-                <div class="simulate-tips">模拟规则：200次随机模拟取平均值，结果更精准</div>
+                <div class="simulate-tips">模拟规则：多次模拟取平均值</div>
                 <div class="profit-diff" id="profitDiff"></div>
                 <div class="chart-container" id="profitChart"></div>
             </div>
@@ -336,6 +373,71 @@
     <script>
         // 初始化ECharts实例
         let myChart = echarts.init(document.getElementById('profitChart'));
+        // 全局存储商品列表和参数
+        let globalGoodsList = [];
+        let globalStallCapacity = 6;
+
+        function calculateCustomerProfit(items, maxPurchases) {
+            let profit = 0;
+            let buyCount = 0;
+            let usedTime = 0;
+            let isLeave = false;
+            
+            for (const item of items) {
+                // 终止条件：限购已满 / 总浏览时间超5分钟 / 已离开
+                if (buyCount >= maxPurchases || usedTime >= 5 || isLeave) break;
+                
+                usedTime += item.t;
+                
+                // 跳过概率判断（C++逻辑：跳过则不购买，继续下一个）
+                if (Math.random() <= item.q) continue;
+                
+                // 购买逻辑
+                if (Math.random() <= item.l && buyCount < maxPurchases) {
+                    profit += item.m;
+                    buyCount++;
+                }
+                
+                // 离开概率判断（C++离开逻辑：离开则终止浏览）
+                if (Math.random() <= item.r) {
+                    isLeave = true;
+                    break;
+                }
+            }
+            
+            return profit;
+        }
+
+        // 模拟一次义卖活动（匹配C++的simulate_sale）
+        function simulateSale(params) {
+            const totalCustomers = Math.floor(params.customersPerUnit * params.totalTime);
+            let totalProfit = 0;
+            
+            // 计算总浏览时间（如果超过总时长则返回0）
+            const totalBrowsingTime = params.items.reduce((sum, item) => sum + item.t, 0);
+            if (totalBrowsingTime > params.totalTime) return 0;
+            
+            // 计算每个顾客的利润贡献
+            for (let i = 0; i < totalCustomers; i++) {
+                totalProfit += calculateCustomerProfit(params.items, params.maxPurchases);
+            }
+            
+            return totalProfit;
+        }
+
+        // 运行多次模拟并计算平均值（匹配C++的run_multiple_simulations）
+        function runMultipleSimulations(params) {
+            let totalProfit = 0;
+            let currentProfit = 0;
+            
+            for (let i = 0; i < params.numSimulations; i++) {
+                currentProfit = simulateSale(params);
+                totalProfit += currentProfit;
+                console.log(`已完成1次模拟，利润：${currentProfit} 目前总利润:${totalProfit}`);
+            }
+            
+            return Math.round(totalProfit / params.numSimulations);
+        }
 
         // 添加商品行
         function addRow() {
@@ -373,17 +475,28 @@
 
         // 重置默认数据
         function resetData() {
-            location.reload(); // 刷新页面恢复初始默认数据
+            location.reload();
         }
 
-        // 全局计算+利润模拟
+        // 构建C++风格的SaleParams参数对象
+        function buildSaleParams(itemsList) {
+            return {
+                totalTime: parseFloat(document.getElementById('totalTime').value) || 120,
+                customersPerUnit: parseFloat(document.getElementById('customersPerUnit').value) || 5,
+                maxPurchases: parseInt(document.getElementById('maxPurchases').value) || 2,
+                numSimulations: parseInt(document.getElementById('numSimulations').value) || 200,
+                items: itemsList // 裁剪后的商品列表
+            };
+        }
+
+        // 核心计算逻辑
         function calculateAll() {
             const table = document.getElementById('goodsTable').querySelector('tbody');
             const rows = table.querySelectorAll('tr');
-            let totalLM = 0; // 总赚钱潜力
-            const goodsList = []; // 存储商品数据
+            let totalLM = 0;
+            const goodsList = [];
             
-            // 第一步：校验并计算l×m和总赚钱潜力
+            // 1. 校验并计算基础参数
             for (let i = 0; i < rows.length; i++) {
                 const row = rows[i];
                 const id = parseInt(row.cells[0].querySelector('input').value);
@@ -393,7 +506,6 @@
                 const q = parseFloat(row.cells[4].querySelector('input').value) || 0;
                 const r = parseFloat(row.cells[5].querySelector('input').value) || 0;
 
-                // 校验必填项
                 if (l === 0 || m === 0 || t === 0 || q === 0 || r === 0) {
                     alert(`商品ID${id}：参数不能为空，请填写完整！`);
                     return;
@@ -411,132 +523,153 @@
                 });
             }
 
-            // 第二步：计算性价比
+            // 2. 计算性价比
             goodsList.forEach(goods => {
-                const numerator = Math.pow(goods.lm, 2); // (l×m)²
+                const numerator = Math.pow(goods.lm, 2);
                 const denominator = goods.t * (goods.q + goods.r * (totalLM / goods.lm));
-                const ratio = (numerator / denominator).toFixed(2);
+                const ratio = denominator === 0 ? 0 : (numerator / denominator).toFixed(2);
                 goods.ratio = parseFloat(ratio);
                 goods.row.cells[7].textContent = ratio;
             });
 
-            // 第三步：排序并生成摆放顺序
-            // 优化排序（按性价比降序）
+            // 3. 排序生成摆放顺序
             const optimizedList = [...goodsList].sort((a, b) => b.ratio - a.ratio);
             optimizedList.forEach((goods, index) => {
-                const rank = index + 1;
-                goods.row.cells[8].textContent = rank;
-                goods.rank = rank;
+                goods.row.cells[8].textContent = index + 1;
+                goods.rank = index + 1;
             });
-
-            // 默认排序（按ID升序）
             const defaultList = [...goodsList].sort((a, b) => a.id - b.id);
 
-            // 第四步：展示摆放顺序+摊位容量提示
-            const stallCapacity = parseInt(document.getElementById('stallCapacity').value) || 6;
+            // 4. 全局存储
+            globalGoodsList = goodsList;
+            globalStallCapacity = parseInt(document.getElementById('stallCapacity').value) || 6;
+
+            // 5. 展示摆放顺序
             const sortText = optimizedList.map(g => `商品${g.id}（性价比：${g.ratio}）→ 摆放位置${g.rank}`).join('<br>');
             document.getElementById('sortResult').innerHTML = sortText;
-            document.getElementById('capacityTips').innerHTML = `摊位容量限制：仅展示前${stallCapacity}件商品（ID：${optimizedList.slice(0, stallCapacity).map(g => g.id).join(', ')}）`;
+            document.getElementById('capacityTips').innerHTML = `摊位容量限制：仅展示前${globalStallCapacity}件商品（ID：${optimizedList.slice(0, globalStallCapacity).map(g => g.id).join(', ')}）`;
 
-            // 第五步：利润模拟计算（200次平均）
-            simulateProfit(optimizedList, defaultList, stallCapacity);
-        }
+            // 6. 裁剪商品列表到摊位容量
+            const optimizedListLimit = optimizedList.slice(0, globalStallCapacity);
+            const defaultListLimit = defaultList.slice(0, globalStallCapacity);
 
-        // 利润模拟函数（200次取平均 + 摊位容量限制）
-        function simulateProfit(optimizedList, defaultList, stallCapacity) {
-            // 获取场景参数
-            const totalTime = parseFloat(document.getElementById('totalTime').value) || 120;
-            const flowRate = parseFloat(document.getElementById('flowRate').value) || 5;
-            const buyLimit = parseInt(document.getElementById('buyLimit').value) || 2;
+            // 7. 调用C++风格的模拟函数
+            const optimizedParams = buildSaleParams(optimizedListLimit);
+            const defaultParams = buildSaleParams(defaultListLimit);
+            const optimizedProfit = runMultipleSimulations(optimizedParams);
+            const defaultProfit = runMultipleSimulations(defaultParams);
 
-            // 总客流量 = 总时长 × 客流量
-            const totalCustomer = totalTime * flowRate;
-            // 单客可浏览商品数 = 基于商品平均浏览时间计算（固定5分钟浏览时长）
-            const avgGoodsTime = optimizedList.reduce((sum, g) => sum + g.t, 0) / optimizedList.length;
-            const browseCountPerCustomer = Math.floor(5 / avgGoodsTime);
-
-            // 裁剪商品列表到摊位容量
-            const optimizedListLimit = optimizedList.slice(0, stallCapacity);
-            const defaultListLimit = defaultList.slice(0, stallCapacity);
-
-            // 计算单种排序的总利润
-            function calcProfit(sortList) {
-                let totalProfit = 0;
-                // 遍历每个顾客
-                for (let c = 0; c < totalCustomer; c++) {
-                    let totalBuyCount = 0; // 单客已购买总件数（不超buyLimit）
-                    
-                    // 顾客浏览商品（最多浏览browseCountPerCustomer件，或买到限购数为止）
-                    for (let i = 0; i < Math.min(browseCountPerCustomer, sortList.length); i++) {
-                        if (totalBuyCount >= buyLimit) break;
-                        const goods = sortList[i];
-                        
-                        // 随机判断是否购买（按购买概率l）
-                        if (Math.random() <= goods.l) {
-                            totalProfit += goods.m;
-                            totalBuyCount++;
-                        }
-                        // 随机判断是否离开（按离开概率r）
-                        if (Math.random() <= goods.r) break;
-                    }
-                }
-                return Math.round(totalProfit);
-            }
-
-            // 模拟200次取平均值（核心修改点）
-            const simulateTimes = 200;
-            let optimizedProfit = 0;
-            let defaultProfit = 0;
-            for (let i = 0; i < simulateTimes; i++) {
-                optimizedProfit += calcProfit(optimizedListLimit);
-                defaultProfit += calcProfit(defaultListLimit);
-            }
-            optimizedProfit = Math.round(optimizedProfit / simulateTimes);
-            defaultProfit = Math.round(defaultProfit / simulateTimes);
-            const profitIncrease = optimizedProfit - defaultProfit;
-            const increaseRate = ((profitIncrease / defaultProfit) * 100).toFixed(2);
-
-            // 展示模拟结果（标注摊位容量+模拟次数）
+            // 8. 展示结果
             document.getElementById('simulationText').innerHTML = `
-                模拟条件：义卖总时长${totalTime}分钟，客流量${flowRate}人/分钟<br>
-                规则：单客限购${buyLimit}件，摊位最大容量${stallCapacity}件<br>
+                模拟条件：义卖总时长${optimizedParams.totalTime}分钟，客流量${optimizedParams.customersPerUnit}人/分钟<br>
+                规则：单客限购${optimizedParams.maxPurchases}件，摊位最大容量${globalStallCapacity}件，模拟次数${optimizedParams.numSimulations}次<br>
                 默认排序（按ID）总利润：${defaultProfit}元<br>
                 优化排序（按性价比）总利润：${optimizedProfit}元
             `;
+            const profitIncrease = optimizedProfit - defaultProfit;
+            const increaseRate = defaultProfit === 0 ? 0 : ((profitIncrease / defaultProfit) * 100).toFixed(2);
             document.getElementById('profitDiff').innerHTML = `
-                利润提升：${profitIncrease}元（提升幅度${increaseRate}%）
+                优化排序对比默认排序：利润提升${profitIncrease}元（提升幅度${increaseRate}%）
             `;
 
-            // 绘制可视化图表
+            // 9. 渲染图表
+            renderChart(optimizedProfit, defaultProfit, null);
+        }
+
+        // 自定义顺序模拟
+        function simulateCustomSort() {
+            if (globalGoodsList.length === 0) {
+                alert('请先点击「计算」生成商品数据！');
+                return;
+            }
+            const inputVal = document.getElementById('customSortInput').value.trim();
+            if (!inputVal) {
+                alert('请输入自定义商品ID顺序！');
+                return;
+            }
+            // 解析输入的ID列表
+            const customIdList = inputVal.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+            // 校验ID是否存在
+            const validIds = globalGoodsList.map(g => g.id);
+            const invalidIds = customIdList.filter(id => !validIds.includes(id));
+            if (invalidIds.length > 0) {
+                alert(`输入的商品ID不存在：${invalidIds.join(', ')}，请修正！`);
+                return;
+            }
+            // 校验数量不超过摊位容量
+            if (customIdList.length > globalStallCapacity) {
+                alert(`自定义顺序的商品数量（${customIdList.length}）超过摊位最大容量（${globalStallCapacity}），请删减！`);
+                return;
+            }
+            // 生成自定义排序的商品列表
+            const customList = customIdList.map(id => globalGoodsList.find(g => g.id === id));
+            // 重新排序最优/默认列表
+            const optimizedList = [...globalGoodsList].sort((a, b) => b.ratio - a.ratio);
+            const defaultList = [...globalGoodsList].sort((a, b) => a.id - b.id);
+            // 裁剪到摊位容量
+            const optimizedListLimit = optimizedList.slice(0, globalStallCapacity);
+            const defaultListLimit = defaultList.slice(0, globalStallCapacity);
+            const customListLimit = customList.slice(0, globalStallCapacity);
+            // 调用模拟函数
+            const optimizedParams = buildSaleParams(optimizedListLimit);
+            const defaultParams = buildSaleParams(defaultListLimit);
+            const customParams = buildSaleParams(customListLimit);
+            const optimizedProfit = runMultipleSimulations(optimizedParams);
+            const defaultProfit = runMultipleSimulations(defaultParams);
+            const customProfit = runMultipleSimulations(customParams);
+            // 展示结果
+            document.getElementById('simulationText').innerHTML = `
+                模拟条件：义卖总时长${optimizedParams.totalTime}分钟，客流量${optimizedParams.customersPerUnit}人/分钟<br>
+                规则：单客限购${optimizedParams.maxPurchases}件，摊位最大容量${globalStallCapacity}件，模拟次数${optimizedParams.numSimulations}次<br>
+                默认排序（按ID）总利润：${defaultProfit}元<br>
+                优化排序（按性价比）总利润：${optimizedProfit}元<br>
+                自定义排序总利润：${customProfit}元
+            `;
+            const customVsOpt = customProfit - optimizedProfit;
+            const customVsDef = customProfit - defaultProfit;
+            document.getElementById('profitDiff').innerHTML = `
+                自定义排序 vs 优化排序：${customVsOpt > 0 ? '提升' : '降低'}${Math.abs(customVsOpt)}元<br>
+                自定义排序 vs 默认排序：${customVsDef > 0 ? '提升' : '降低'}${Math.abs(customVsDef)}元
+            `;
+            // 渲染图表
+            renderChart(optimizedProfit, defaultProfit, customProfit);
+        }
+
+        // 渲染图表函数
+        function renderChart(optimizedProfit, defaultProfit, customProfit) {
+            const xAxisData = ['默认排序（按ID）', '优化排序（按性价比）'];
+            const seriesData = [defaultProfit, optimizedProfit];
+            const seriesColor = ['#94a3b8', '#2563eb'];
+            // 新增自定义顺序数据
+            if (customProfit !== null) {
+                xAxisData.push('自定义排序');
+                seriesData.push(customProfit);
+                seriesColor.push('#f59e0b');
+            }
+            // 图表配置
             myChart.setOption({
-                title: { text: '义卖利润对比（200次模拟平均值）', left: 'center' },
+                title: { text: '义卖利润对比', left: 'center' },
                 tooltip: { trigger: 'axis' },
                 legend: { data: ['总利润（元）'], left: 'left' },
                 xAxis: {
                     type: 'category',
-                    data: ['默认排序（按ID）', '优化排序（按性价比）']
+                    data: xAxisData
                 },
                 yAxis: { type: 'value', name: '利润（元）' },
                 series: [{
                     name: '总利润',
                     type: 'bar',
-                    data: [defaultProfit, optimizedProfit],
-                    itemStyle: {
-                        color: ['#94a3b8', '#2563eb']
-                    },
-                    label: {
-                        show: true,
-                        position: 'top',
-                        formatter: '{c}元'
-                    }
+                    data: seriesData,
+                    itemStyle: { color: seriesColor },
+                    label: { show: true, position: 'top', formatter: '{c}元' }
                 }]
             });
         }
 
-        // 页面加载完成后初始化图表
+        // 初始化图表
         window.onload = function() {
             myChart.setOption({
-                title: { text: '义卖利润对比（200次模拟平均值）', left: 'center' },
+                title: { text: '义卖利润对比', left: 'center' },
                 tooltip: { trigger: 'axis' },
                 legend: { data: ['总利润（元）'], left: 'left' },
                 xAxis: { type: 'category', data: ['默认排序（按ID）', '优化排序（按性价比）'] },
